@@ -1,0 +1,23 @@
+# База данных
+*.db
+*.db-wal
+*.db-shm
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+*.egg-info/
+
+# Окружение
+.env
+*.env
+
+# macOS
+.DS_Store
+
+# Бэкапы
+*.backup.*
+Архив.zip
