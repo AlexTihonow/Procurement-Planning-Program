@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Заметки</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: #f0f2f5; height: 100vh; display: flex; }
+
+    /* ── Layout ── */
+    .app { display: flex; width: 100%; height: 100vh; overflow: hidden; }
+
+    /* ── Sidebar ── */
+    .sidebar { width: 260px; min-width: 200px; background: #fff; border-right: 1px solid #dde1e7; display: flex; flex-direction: column; }
+    .sidebar-header { padding: 14px 12px 8px; border-bottom: 1px solid #dde1e7; }
+    .sidebar-header h1 { font-size: 15px; font-weight: 600; color: #1a1d21; margin-bottom: 10px; }
+    .btn-row { display: flex; gap: 6px; }
+    .btn-new { flex: 1; padding: 8px; background: #1a73e8; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; transition: background .15s; }
+    .btn-new:hover { background: #1558b0; }
+    .btn-print { flex-shrink: 0; padding: 8px 10px; background: #fff; color: #5f6368; border: 1px solid #dde1e7; border-radius: 6px; cursor: pointer; font-size: 15px; line-height: 1; transition: background .15s; }
+    .btn-print:hover { background: #f0f2f5; color: #1a1d21; }
+
+    /* ── Sidebar filter ── */
+    .sf-wrap { padding: 8px 8px 6px; border-bottom: 1px solid #dde1e7; }
+    .sf-row { display: flex; align-items: center; gap: 4px; }
+    .sf-input { flex: 1; min-width: 0; padding: 6px 8px; border: 1px solid #dde1e7; border-radius: 6px; font-size: 12px; font-family: 'Courier New', monospace; transition: border-color .15s; }
+    .sf-input:focus { outline: none; border-color: #1a73e8; }
+    .sf-input.active { border-color: #1a73e8; background: #f0f5ff; }
+    .sf-icon-btn { flex-shrink: 0; padding: 5px 8px; border: 1px solid #dde1e7; border-radius: 6px; background: #fff; cursor: pointer; font-size: 12px; color: #9aa0a6; line-height: 1; transition: background .1s; }
+    .sf-icon-btn:hover { background: #f0f2f5; color: #3c4043; }
+    .sf-save-row { display: flex; gap: 4px; margin-top: 5px; }
+    .sf-name-input { flex: 1; min-width: 0; padding: 5px 8px; border: 1px solid #dde1e7; border-radius: 6px; font-size: 12px; transition: border-color .15s; }
+    .sf-name-input:focus { outline: none; border-color: #1a73e8; }
+    .sf-save-btn { padding: 5px 10px; font-size: 12px; border-radius: 6px; border: none; background: #1a73e8; color: #fff; cursor: pointer; white-space: nowrap; font-weight: 500; }
+    .sf-save-btn:hover { background: #1558b0; }
+    .sf-count { font-size: 11px; color: #9aa0a6; padding: 3px 1px 0; }
+    .sf-dd { position: absolute; left: 0; top: calc(100% + 4px); background: #fff; border: 1px solid #dde1e7; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,.12); z-index: 300; min-width: 230px; }
+
+    .notes-list { flex: 1; overflow-y: auto; padding: 6px; }
+    .note-item { padding: 9px 10px; border-radius: 6px; cursor: pointer; margin-bottom: 2px; border: 1px solid transparent; transition: background .1s; }
+    .note-item:hover { background: #f0f2f5; }
+    .note-item.active { background: #e8f0fe; border-color: #1a73e8; }
+    .note-item-text { font-size: 13px; color: #1a1d21; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .note-item-tags { font-size: 11px; color: #1a73e8; margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .note-item-date { font-size: 11px; color: #9aa0a6; margin-top: 2px; }
+    .notes-empty { padding: 20px 12px; color: #9aa0a6; font-size: 13px; text-align: center; }
+
+    /* ── Main ── */
+    .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+    .tabs { display: flex; background: #fff; border-bottom: 1px solid #dde1e7; padding: 0 16px; gap: 4px; }
+    .tab { padding: 11px 14px; cursor: pointer; font-size: 13px; font-weight: 500; color: #5f6368; border-bottom: 2px solid transparent; user-select: none; transition: color .15s; }
+    .tab:hover { color: #1a1d21; }
+    .tab.active { color: #1a73e8; border-bottom-color: #1a73e8; }
+    .main-content { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+
+    /* ── Editor ── */
+    #view-editor { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .editor-empty { flex: 1; display: flex; align-items: center; justify-content: center; color: #9aa0a6; font-size: 15px; }
+    .editor-body { flex: 1; display: flex; flex-direction: column; overflow: hidden; padding: 16px; gap: 12px; }
+    .field-label { font-size: 11px; font-weight: 600; color: #9aa0a6; text-transform: uppercase; letter-spacing: .6px; margin-bottom: 6px; }
+    .note-textarea { width: 100%; border: 1px solid #dde1e7; border-radius: 6px; padding: 10px 12px; font-size: 14px; resize: none; font-family: inherit; flex: 1; min-height: 140px; line-height: 1.5; transition: border-color .15s; }
+    .note-textarea:focus { outline: none; border-color: #1a73e8; }
+    .hashtag-wrap { position: relative; }
+    .hashtag-textarea { width: 100%; border: 1px solid #dde1e7; border-radius: 6px; padding: 10px 12px; font-size: 13px; resize: vertical; min-height: 90px; font-family: 'Courier New', monospace; line-height: 1.6; transition: border-color .15s; }
+    .hashtag-textarea:focus { outline: none; border-color: #1a73e8; }
+    .editor-footer { display: flex; align-items: center; gap: 8px; padding-top: 4px; border-top: 1px solid #dde1e7; }
+    .save-status { font-size: 12px; color: #34a853; flex: 1; }
+    .btn { padding: 7px 14px; border-radius: 6px; border: 1px solid #dde1e7; cursor: pointer; font-size: 13px; font-weight: 500; background: #fff; color: #3c4043; transition: background .1s; }
+    .btn:hover { background: #f0f2f5; }
+    .btn-danger { border-color: #d93025; color: #d93025; }
+    .btn-danger:hover { background: #fce8e6; }
+    .btn-primary { background: #1a73e8; color: #fff; border-color: #1a73e8; }
+    .btn-primary:hover { background: #1558b0; }
+
+    /* ── Autocomplete ── */
+    .autocomplete { position: absolute; left: 0; background: #fff; border: 1px solid #dde1e7; border-radius: 8px; box-shadow: 0 -4px 16px rgba(0,0,0,.12); z-index: 200; min-width: 220px; overflow-y: auto; }
+    .ac-item { padding: 8px 12px; cursor: pointer; font-size: 13px; color: #1a1d21; }
+    .ac-item:hover, .ac-item.sel { background: #e8f0fe; color: #1a73e8; }
+    .ac-hint { padding: 6px 12px 4px; font-size: 11px; color: #9aa0a6; border-bottom: 1px solid #f0f2f5; }
+
+    /* ── Hashtag list ── */
+    #view-hashtags { flex: 1; display: none; flex-direction: column; overflow: hidden; }
+    .filter-bar { display: flex; align-items: center; gap: 8px; padding: 12px 16px; background: #fff; border-bottom: 1px solid #dde1e7; flex-wrap: wrap; }
+    .filter-input { flex: 1; min-width: 160px; padding: 8px 12px; border: 1px solid #dde1e7; border-radius: 6px; font-size: 13px; font-family: 'Courier New', monospace; transition: border-color .15s; }
+    .filter-input:focus { outline: none; border-color: #1a73e8; }
+    .filter-name-input { width: 150px; padding: 8px 12px; border: 1px solid #dde1e7; border-radius: 6px; font-size: 13px; transition: border-color .15s; }
+    .filter-name-input:focus { outline: none; border-color: #1a73e8; }
+    .saved-filters-wrap { position: relative; }
+    .btn-dots { padding: 7px 11px; border-radius: 6px; border: 1px solid #dde1e7; cursor: pointer; font-size: 16px; line-height: 1; background: #fff; color: #5f6368; }
+    .btn-dots:hover { background: #f0f2f5; }
+    .saved-dropdown { position: absolute; right: 0; top: calc(100% + 4px); background: #fff; border: 1px solid #dde1e7; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,.12); z-index: 200; min-width: 230px; }
+    .saved-dd-header { padding: 8px 12px 6px; font-size: 11px; font-weight: 600; color: #9aa0a6; text-transform: uppercase; letter-spacing: .6px; }
+    .saved-item { display: flex; align-items: center; padding: 8px 12px; cursor: pointer; gap: 8px; }
+    .saved-item:hover { background: #f0f2f5; }
+    .saved-item-name { flex: 1; font-size: 13px; color: #1a1d21; }
+    .saved-item-filter { font-size: 11px; color: #9aa0a6; font-family: 'Courier New', monospace; }
+    .saved-item-del { color: #9aa0a6; font-size: 13px; padding: 2px 4px; border-radius: 3px; }
+    .saved-item-del:hover { color: #d93025; background: #fce8e6; }
+    .saved-dd-empty { padding: 14px 12px; color: #9aa0a6; font-size: 13px; text-align: center; }
+
+    .hashtag-entries { flex: 1; overflow-y: auto; padding: 12px 16px; }
+    .ht-entry { display: flex; align-items: center; padding: 8px 12px; background: #fff; border-radius: 6px; border: 1px solid #dde1e7; margin-bottom: 5px; font-size: 13px; font-family: 'Courier New', monospace; color: #3c4043; transition: border-color .1s, background .1s; gap: 6px; }
+    .ht-entry:hover { border-color: #1a73e8; background: #f0f5ff; }
+    .ht-entry-tokens { flex: 1; cursor: pointer; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .ht-tok-match { color: #1a73e8; font-weight: 600; }
+    .ht-tok-next { color: #34a853; font-weight: 600; background: #e6f4ea; border-radius: 3px; padding: 0 3px; }
+    .ht-tok-rest { color: #5f6368; }
+    .ht-note-count { font-size: 11px; color: #9aa0a6; font-family: system-ui; white-space: nowrap; }
+    .ht-del { margin-left: 4px; padding: 2px 6px; border-radius: 4px; cursor: pointer; color: #9aa0a6; font-size: 13px; font-family: system-ui; opacity: 0; transition: opacity .15s, color .15s, background .15s; }
+    .ht-entry:hover .ht-del { opacity: 1; }
+    .ht-del:hover { color: #d93025; background: #fce8e6; }
+    .no-results { padding: 40px; color: #9aa0a6; text-align: center; font-size: 14px; }
+    .filter-breadcrumb { display: flex; align-items: center; gap: 4px; padding: 0 16px 0 0; flex-wrap: wrap; }
+    .bc-chip { background: #e8f0fe; color: #1a73e8; padding: 3px 8px; border-radius: 12px; font-size: 12px; font-family: 'Courier New', monospace; cursor: pointer; }
+    .bc-chip:hover { background: #d2e3fc; }
+    .bc-sep { color: #9aa0a6; font-size: 12px; }
+    .bc-clear { color: #9aa0a6; cursor: pointer; font-size: 12px; padding: 3px 6px; border-radius: 4px; }
+    .bc-clear:hover { color: #d93025; background: #fce8e6; }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ── Sidebar ── -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <h1>Заметки</h1>
+      <div class="btn-row">
+        <button class="btn-new" onclick="newNote()">+ Новая заметка</button>
+        <button class="btn-print" onclick="printNotes()" title="Печать заметок">🖨</button>
+      </div>
+    </div>
+
+    <!-- Sidebar filter -->
+    <div class="sf-wrap">
+      <div class="sf-row">
+        <input class="sf-input" id="sfInput"
+          placeholder="#Параметр ..."
+          oninput="onSfInput()" />
+        <button class="sf-icon-btn" id="sfClearBtn" onclick="clearSf()" style="display:none;" title="Сбросить фильтр">✕</button>
+        <div class="saved-filters-wrap" style="position:relative;">
+          <button class="sf-icon-btn" id="sfDotsBtn" onclick="toggleSfDd()" title="Сохранённые фильтры">•••</button>
+          <div class="sf-dd" id="sfDropdown" style="display:none;"></div>
+        </div>
+      </div>
+      <div class="sf-save-row" id="sfSaveRow" style="display:none;">
+        <input class="sf-name-input" id="sfNameInput" placeholder="Название фильтра" />
+        <button class="sf-save-btn" id="sfSaveBtn" onclick="saveSf()">Сохранить</button>
+      </div>
+      <div class="sf-count" id="sfCount"></div>
+    </div>
+
+    <div class="notes-list" id="notesList"></div>
+  </div>
+
+  <!-- ── Main ── -->
+  <div class="main">
+    <div class="tabs">
+      <div class="tab active" id="tab-editor" onclick="switchTab('editor')">Редактор</div>
+      <div class="tab" id="tab-hashtags" onclick="switchTab('hashtags')">Все параметры</div>
+    </div>
+
+    <div class="main-content">
+
+      <!-- Editor view -->
+      <div id="view-editor">
+        <div class="editor-empty" id="editorEmpty">Выберите или создайте заметку</div>
+        <div class="editor-body" id="editorBody" style="display:none;">
+          <div style="display:flex;flex-direction:column;flex:1;min-height:0;">
+            <div class="field-label">Текст заметки</div>
+            <textarea class="note-textarea" id="noteText"
+              placeholder="Введите текст заметки..."
+              oninput="autoSave()"></textarea>
+          </div>
+
+          <div>
+            <div class="field-label">Параметры <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#bbb;">— каждый с новой строки</span></div>
+            <div class="hashtag-wrap">
+              <textarea class="hashtag-textarea" id="hashtagInput" rows="5"
+                placeholder="#Организация Водоканал Тихонов 2-11-44&#10;#Тип Важный"
+                oninput="onHashtagInput(event)"
+                onkeydown="onHashtagKeydown(event)"
+                onblur="onHashtagBlur()"></textarea>
+              <div class="autocomplete" id="autocomplete" style="display:none;"></div>
+            </div>
+          </div>
+
+          <div class="editor-footer">
+            <button class="btn btn-danger" onclick="deleteNote()">Удалить</button>
+            <span class="save-status" id="saveStatus"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Hashtag list view -->
+      <div id="view-hashtags">
+        <div class="filter-bar">
+          <input class="filter-input" id="hashtagFilter"
+            placeholder='Фильтр: #Организация Администрация'
+            oninput="onFilterInput()" />
+          <input class="filter-name-input" id="filterName"
+            placeholder="Название фильтра"
+            oninput="onFilterNameInput()"
+            style="display:none;" />
+          <button class="btn btn-primary" id="btnFilter" onclick="handleFilterBtn()">Фильтровать</button>
+          <div class="saved-filters-wrap">
+            <button class="btn-dots" id="btnDots" onclick="toggleSavedDropdown()" title="Сохранённые фильтры">•••</button>
+            <div class="saved-dropdown" id="savedDropdown" style="display:none;"></div>
+          </div>
+        </div>
+        <div class="filter-breadcrumb" id="filterBreadcrumb"></div>
+        <div class="hashtag-entries" id="hashtagEntries"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════
+//  State
+// ════════════════════════════════════════
+let notes        = JSON.parse(localStorage.getItem('ms2_notes')        || '[]');
+let savedFilters = JSON.parse(localStorage.getItem('ms2_savedFilters') || '[]');
+
+let currentNoteId = null;
+let acSuggestions = [];
+let acIndex = -1;
+let acVisible = false;
+let acReplacePartial = false; // нужно ли заменять последний частичный токен
+let autoSaveTimer = null;
+let currentFilter = '';    // filter for "All hashtags" tab
+let notesFilter   = '';    // filter for notes sidebar
+
+// ════════════════════════════════════════
+//  Persistence helpers
+// ════════════════════════════════════════
+function persist() {
+  localStorage.setItem('ms2_notes', JSON.stringify(notes));
+}
+function persistFilters() {
+  localStorage.setItem('ms2_savedFilters', JSON.stringify(savedFilters));
+}
+function uid() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2);
+}
+function fmtDate(ts) {
+  return new Date(ts).toLocaleDateString('ru-RU', {day:'2-digit',month:'2-digit',year:'2-digit'});
+}
+function h(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ════════════════════════════════════════
+//  Hashtag utilities
+// ════════════════════════════════════════
+function allHashtagLines() {
+  const set = new Set();
+  for (const n of notes) {
+    for (const line of (n.hashtags || [])) {
+      const t = line.trim();
+      if (t.startsWith('#')) set.add(t);
+    }
+  }
+  return [...set];
+}
+
+// Returns how many notes contain a given hashtag line
+function noteCountForLine(line) {
+  const lc = line.toLowerCase();
+  return notes.filter(n => (n.hashtags||[]).some(t => t.trim().toLowerCase() === lc)).length;
+}
+
+/**
+ * Given a typed prefix (e.g. "#Организация Администрация"),
+ * return array of next-token suggestions.
+ */
+/**
+ * Возвращает { list, replacePartial }.
+ * list          — массив подсказок (следующие токены).
+ * replacePartial — true, если последний токен набран частично
+ *                  и подсказка должна ЗАМЕНИТЬ его, а не дописаться после.
+ *
+ * Примеры:
+ *   "#"             → список всех первых токенов (#Организация, #Тип …), replacePartial=true
+ *   "#Орг"          → список первых токенов начинающихся на «Орг», replacePartial=true
+ *   "#Организация " → список вторых токенов (Водоканал, Администрация), replacePartial=false
+ *   "#Организация А"→ список вторых токенов начинающихся на «А», replacePartial=true
+ */
+function getSuggestions(rawLine) {
+  const hasTrailingSpace = /\s$/.test(rawLine);
+  const tokens = rawLine.trim().split(/\s+/).filter(Boolean);
+  if (!tokens.length) return { list: [], replacePartial: false };
+
+  // Если пробел на конце — все токены завершены, ищем следующий уровень
+  // Если нет — последний токен набран частично, сравниваем через startsWith
+  const completedTokens = hasTrailingSpace ? tokens : tokens.slice(0, -1);
+  const partialToken    = hasTrailingSpace ? '' : tokens[tokens.length - 1];
+
+  const candidates = new Set();
+  for (const line of allHashtagLines()) {
+    const lt = line.trim().split(/\s+/).filter(Boolean);
+    if (lt.length <= completedTokens.length) continue;
+    // Совпадение по завершённым токенам (точное)
+    let ok = true;
+    for (let i = 0; i < completedTokens.length; i++) {
+      if (lt[i].toLowerCase() !== completedTokens[i].toLowerCase()) { ok = false; break; }
+    }
+    if (!ok) continue;
+    // Кандидат — токен на следующей позиции
+    const cand = lt[completedTokens.length];
+    // Если есть частичный токен — фильтруем по startsWith
+    if (!partialToken || cand.toLowerCase().startsWith(partialToken.toLowerCase())) {
+      candidates.add(cand);
+    }
+  }
+  return { list: [...candidates].sort(), replacePartial: partialToken.length > 0 };
+}
+
+// ════════════════════════════════════════
+//  Sidebar filter (notes)
+// ════════════════════════════════════════
+function noteMatchesFilter(note) {
+  if (!notesFilter.trim()) return true;
+  const tokens = notesFilter.trim().split(/\s+/).filter(Boolean);
+  return (note.hashtags || []).some(line => {
+    const lt = line.trim().split(/\s+/).filter(Boolean);
+    if (lt.length < tokens.length) return false;
+    return tokens.every((t, i) => lt[i].toLowerCase() === t.toLowerCase());
+  });
+}
+
+function onSfInput() {
+  notesFilter = document.getElementById('sfInput').value;
+  updateSfUI();
+  renderNotesList();
+}
+
+function clearSf() {
+  document.getElementById('sfInput').value = '';
+  notesFilter = '';
+  updateSfUI();
+  renderNotesList();
+}
+
+function updateSfUI() {
+  const has = notesFilter.trim().length > 0;
+  document.getElementById('sfInput').className = 'sf-input' + (has ? ' active' : '');
+  document.getElementById('sfClearBtn').style.display  = has ? '' : 'none';
+  document.getElementById('sfSaveRow').style.display   = has ? 'flex' : 'none';
+  if (!has) {
+    document.getElementById('sfNameInput').value = '';
+    document.getElementById('sfDropdown').style.display = 'none';
+  }
+  updateSfCount();
+}
+
+function updateSfCount() {
+  const el = document.getElementById('sfCount');
+  if (!notesFilter.trim()) { el.textContent = ''; return; }
+  const total    = notes.length;
+  const filtered = notes.filter(noteMatchesFilter).length;
+  el.textContent = `${filtered} из ${total} заметок`;
+}
+
+function toggleSfDd() {
+  const dd = document.getElementById('sfDropdown');
+  if (dd.style.display === 'none') { renderSfDd(); dd.style.display = 'block'; }
+  else dd.style.display = 'none';
+}
+
+function renderSfDd() {
+  const dd = document.getElementById('sfDropdown');
+  if (!savedFilters.length) {
+    dd.innerHTML = '<div class="saved-dd-empty">Нет сохранённых фильтров</div>';
+    return;
+  }
+  dd.innerHTML = '<div class="saved-dd-header">Сохранённые фильтры</div>' +
+    savedFilters.map(f =>
+      `<div class="saved-item">
+        <div onclick="loadSfFilter('${h(f.id)}')" style="flex:1;cursor:pointer;">
+          <div class="saved-item-name">${h(f.name)}</div>
+          <div class="saved-item-filter">${h(f.filter)}</div>
+        </div>
+        <span class="saved-item-del" onclick="deleteSharedFilter('${h(f.id)}')" title="Удалить">✕</span>
+      </div>`
+    ).join('');
+}
+
+function loadSfFilter(id) {
+  const f = savedFilters.find(x => x.id === id);
+  if (!f) return;
+  document.getElementById('sfInput').value = f.filter;
+  notesFilter = f.filter;
+  document.getElementById('sfDropdown').style.display = 'none';
+  updateSfUI();
+  renderNotesList();
+}
+
+function saveSf() {
+  const filter = notesFilter.trim();
+  const name   = document.getElementById('sfNameInput').value.trim();
+  if (!filter || !name) { document.getElementById('sfNameInput').focus(); return; }
+  const idx = savedFilters.findIndex(f => f.name === name);
+  if (idx >= 0) savedFilters[idx] = { id: savedFilters[idx].id, name, filter };
+  else savedFilters.push({ id: uid(), name, filter });
+  persistFilters();
+  document.getElementById('sfNameInput').value = '';
+  const btn = document.getElementById('sfSaveBtn');
+  btn.textContent = '✓ Готово';
+  setTimeout(() => btn.textContent = 'Сохранить', 1400);
+}
+
+// Shared delete: removes from both dropdowns
+function deleteSharedFilter(id) {
+  savedFilters = savedFilters.filter(x => x.id !== id);
+  persistFilters();
+  renderSfDd();
+  const mainDd = document.getElementById('savedDropdown');
+  if (mainDd.style.display !== 'none') renderSavedDropdown();
+}
+
+document.addEventListener('mousedown', e => {
+  const sfDd  = document.getElementById('sfDropdown');
+  const sfBtn = document.getElementById('sfDotsBtn');
+  if (!sfDd.contains(e.target) && e.target !== sfBtn) sfDd.style.display = 'none';
+});
+
+// ════════════════════════════════════════
+//  Notes list
+// ════════════════════════════════════════
+function renderNotesList() {
+  const el = document.getElementById('notesList');
+  const visible = notes.filter(noteMatchesFilter);
+  if (!visible.length) {
+    el.innerHTML = `<div class="notes-empty">${notesFilter.trim() ? 'Нет заметок по фильтру' : 'Нет заметок'}</div>`;
+    return;
+  }
+  el.innerHTML = visible.map(n => {
+    const preview = (n.content || '').replace(/\n/g,' ').trim().slice(0, 55) || '(пустая)';
+    const tags = (n.hashtags || []).join('  ').slice(0, 60);
+    const cls = n.id === currentNoteId ? 'active' : '';
+    return `<div class="note-item ${cls}" onclick="selectNote('${n.id}')">
+      <div class="note-item-text">${h(preview)}</div>
+      ${tags ? `<div class="note-item-tags">${h(tags)}</div>` : ''}
+      <div class="note-item-date">${fmtDate(n.updatedAt||n.createdAt)}</div>
+    </div>`;
+  }).join('');
+}
+
+// ════════════════════════════════════════
+//  Note CRUD
+// ════════════════════════════════════════
+function newNote() {
+  const n = { id: uid(), content: '', hashtags: [], createdAt: Date.now(), updatedAt: Date.now() };
+  notes.unshift(n);
+  persist();
+  renderNotesList();
+  selectNote(n.id);
+  switchTab('editor');
+}
+
+function selectNote(id) {
+  currentNoteId = id;
+  const n = notes.find(x => x.id === id);
+  if (!n) return;
+  document.getElementById('editorEmpty').style.display = 'none';
+  document.getElementById('editorBody').style.display = 'flex';
+  document.getElementById('noteText').value = n.content || '';
+  document.getElementById('hashtagInput').value = (n.hashtags || []).join('\n');
+  hideAc();
+  switchTab('editor');
+  renderNotesList();
+}
+
+function autoSave() {
+  clearTimeout(autoSaveTimer);
+  autoSaveTimer = setTimeout(commitSave, 600);
+}
+
+function commitSave() {
+  if (!currentNoteId) return;
+  const n = notes.find(x => x.id === currentNoteId);
+  if (!n) return;
+  n.content = document.getElementById('noteText').value;
+  n.hashtags = document.getElementById('hashtagInput').value
+    .split('\n').map(l => l.trim()).filter(l => l.startsWith('#'));
+  n.updatedAt = Date.now();
+  persist();
+  renderNotesList();
+  flashSaved();
+}
+
+function flashSaved() {
+  const el = document.getElementById('saveStatus');
+  el.textContent = '✓ Сохранено';
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.textContent = '', 1800);
+}
+
+function deleteNote() {
+  if (!currentNoteId) return;
+  if (!confirm('Удалить эту заметку?')) return;
+  notes = notes.filter(n => n.id !== currentNoteId);
+  currentNoteId = null;
+  persist();
+  updateSfCount();
+  renderNotesList();
+  document.getElementById('editorEmpty').style.display = 'flex';
+  document.getElementById('editorBody').style.display = 'none';
+}
+
+// ════════════════════════════════════════
+//  Hashtag autocomplete in editor
+// ════════════════════════════════════════
+function onHashtagInput(e) {
+  autoSave();
+
+  const ta = document.getElementById('hashtagInput');
+  const val = ta.value;
+  const pos = ta.selectionStart;
+
+  // Find the current line
+  const lineStart = val.lastIndexOf('\n', pos - 1) + 1;
+  const lineEnd = val.indexOf('\n', pos);
+  const line = val.slice(lineStart, lineEnd === -1 ? undefined : lineEnd);
+
+  if (!line.trim().startsWith('#')) { hideAc(); return; }
+
+  // Передаём line «как есть» — важен пробел на конце для getSuggestions
+  const { list: sugg, replacePartial } = getSuggestions(line);
+  if (!sugg.length) { hideAc(); return; }
+
+  acSuggestions = sugg;
+  acReplacePartial = replacePartial;
+  acIndex = -1;
+  acVisible = true;
+  renderAc();
+  positionAcAboveCaret(ta);
+}
+
+function onHashtagKeydown(e) {
+  if (!acVisible) return;
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    acIndex = Math.min(acIndex + 1, acSuggestions.length - 1);
+    renderAc();
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    acIndex = Math.max(acIndex - 1, -1);
+    renderAc();
+  } else if ((e.key === 'Enter' || e.key === 'Tab') && acIndex >= 0) {
+    e.preventDefault();
+    applyAc(acSuggestions[acIndex], acReplacePartial);
+  } else if (e.key === 'Escape') {
+    hideAc();
+  }
+}
+
+function onHashtagBlur() {
+  // Delay so mousedown on ac-item fires first
+  setTimeout(hideAc, 150);
+  commitSave();
+}
+
+function applyAc(token, replacePartial = false) {
+  const ta = document.getElementById('hashtagInput');
+  const val = ta.value;
+  const pos = ta.selectionStart;
+  const lineStart = val.lastIndexOf('\n', pos - 1) + 1;
+  const lineEnd = val.indexOf('\n', pos);
+  const before = val.slice(0, lineStart);
+  const line = val.slice(lineStart, lineEnd === -1 ? undefined : lineEnd);
+  const after = lineEnd === -1 ? '' : val.slice(lineEnd);
+
+  let newLine;
+  if (replacePartial) {
+    // Заменяем последний частичный токен на выбранную подсказку
+    const lastSpace = line.trimEnd().lastIndexOf(' ');
+    newLine = (lastSpace === -1 ? '' : line.trimEnd().slice(0, lastSpace + 1)) + token;
+  } else {
+    // Если строка уже заканчивается пробелом — просто дописываем токен,
+    // иначе добавляем пробел-разделитель
+    newLine = /\s$/.test(line) ? line + token : line + ' ' + token;
+  }
+
+  ta.value = before + newLine + after;
+  const newPos = lineStart + newLine.length;
+  ta.setSelectionRange(newPos, newPos);
+  ta.focus();
+  hideAc();
+  autoSave();
+}
+
+/**
+ * Вычисляет пиксельную позицию курсора внутри textarea
+ * через зеркальный div с теми же стилями.
+ * Возвращает { top, left } относительно верхнего-левого угла textarea.
+ */
+function getCaretPixelPos(ta) {
+  const mirror = document.createElement('div');
+  const cs = window.getComputedStyle(ta);
+  for (const p of [
+    'fontFamily','fontSize','fontWeight','fontStyle','letterSpacing','lineHeight',
+    'textTransform','paddingTop','paddingRight','paddingBottom','paddingLeft',
+    'borderTopWidth','borderRightWidth','borderBottomWidth','borderLeftWidth',
+    'boxSizing','width','whiteSpace','wordBreak','overflowWrap'
+  ]) mirror.style[p] = cs[p];
+  mirror.style.position   = 'absolute';
+  mirror.style.visibility = 'hidden';
+  mirror.style.top        = '-9999px';
+  mirror.style.left       = '-9999px';
+  mirror.style.overflow   = 'hidden';
+  mirror.style.whiteSpace = 'pre-wrap';
+  document.body.appendChild(mirror);
+
+  // Текст до курсора
+  mirror.textContent = ta.value.substring(0, ta.selectionStart);
+  // Маркер позиции курсора
+  const caret = document.createElement('span');
+  caret.textContent = '\u200b'; // zero-width space
+  mirror.appendChild(caret);
+
+  const top  = caret.offsetTop;
+  const left = caret.offsetLeft;
+  document.body.removeChild(mirror);
+  return { top, left };
+}
+
+/**
+ * Позиционирует autocomplete ВЫШЕ курсора и показывает его.
+ * Дропдаун растёт вверх — bottom привязан к строке курсора.
+ * Ширина = ширине textarea. Высота — по числу строк, макс. 10.
+ */
+function positionAcAboveCaret(ta) {
+  const ac  = document.getElementById('autocomplete');
+  const cs  = window.getComputedStyle(ta);
+  const { top: caretTop } = getCaretPixelPos(ta);
+  const padTop = parseFloat(cs.paddingTop) || 0;
+
+  // Верх строки курсора от верха textarea
+  const cursorLineTop = padTop + caretTop;
+
+  // Зазор между нижним краем меню и строкой курсора — 14 px
+  const GAP = 14;
+  const bottomOffset = ta.offsetHeight - cursorLineTop + GAP;
+
+  // Высота меню по числу подсказок (макс. 10).
+  // Меню может выходить за верхний край textarea — это нормально,
+  // т.к. position:absolute, ограничений по высоте сверху нет.
+  // .ac-hint ≈ 26 px, каждый .ac-item ≈ 33 px
+  const HINT_H = 26;
+  const ITEM_H = 33;
+  const visibleRows = Math.min(acSuggestions.length, 10);
+  const finalH      = HINT_H + visibleRows * ITEM_H;
+
+  ac.style.top       = 'auto';
+  ac.style.bottom    = bottomOffset + 'px';
+  ac.style.left      = '0';
+  ac.style.width     = ta.offsetWidth + 'px';   // ширина = ширине поля
+  ac.style.maxHeight = finalH + 'px';
+  ac.style.display   = 'block';
+}
+
+function renderAc() {
+  const ac = document.getElementById('autocomplete');
+  if (!acSuggestions.length) { hideAc(); return; }
+  ac.innerHTML =
+    '<div class="ac-hint">Продолжение параметра</div>' +
+    acSuggestions.map((s, i) =>
+      `<div class="ac-item${i === acIndex ? ' sel' : ''}" onmousedown="event.preventDefault();applyAcByIdx(${i})">${h(s)}</div>`
+    ).join('');
+}
+
+// Вызов по индексу — избегает проблем с кавычками в HTML-атрибутах
+function applyAcByIdx(i) {
+  if (i >= 0 && i < acSuggestions.length) applyAc(acSuggestions[i], acReplacePartial);
+}
+
+function hideAc() {
+  acVisible = false;
+  acSuggestions = [];
+  acIndex = -1;
+  document.getElementById('autocomplete').style.display = 'none';
+}
+
+document.addEventListener('mousedown', e => {
+  const ac = document.getElementById('autocomplete');
+  if (!ac.contains(e.target)) hideAc();
+});
+
+// ════════════════════════════════════════
+//  Tabs
+// ════════════════════════════════════════
+function switchTab(tab) {
+  const edView = document.getElementById('view-editor');
+  const htView = document.getElementById('view-hashtags');
+  document.getElementById('tab-editor').className   = 'tab' + (tab === 'editor'   ? ' active' : '');
+  document.getElementById('tab-hashtags').className = 'tab' + (tab === 'hashtags' ? ' active' : '');
+  edView.style.display = tab === 'editor'   ? 'flex' : 'none';
+  htView.style.display = tab === 'hashtags' ? 'flex' : 'none';
+  if (tab === 'hashtags') renderHashtagList();
+}
+
+// ════════════════════════════════════════
+//  Hashtag list / filter
+// ════════════════════════════════════════
+function onFilterInput() {
+  currentFilter = document.getElementById('hashtagFilter').value;
+  updateFilterUI();
+  renderHashtagList();
+}
+
+function onFilterNameInput() {
+  updateFilterBtnLabel();
+}
+
+function updateFilterUI() {
+  const hasFilter = currentFilter.trim().length > 0;
+  const nameEl = document.getElementById('filterName');
+  const dotsEl = document.getElementById('btnDots');
+  nameEl.style.display = hasFilter ? 'block' : 'none';
+  if (!hasFilter) {
+    nameEl.value = '';
+    document.getElementById('savedDropdown').style.display = 'none';
+  }
+  updateFilterBtnLabel();
+  renderBreadcrumb();
+}
+
+function updateFilterBtnLabel() {
+  const hasFilter = currentFilter.trim().length > 0;
+  const hasName   = document.getElementById('filterName').value.trim().length > 0;
+  const btn = document.getElementById('btnFilter');
+  if (hasFilter && hasName) {
+    btn.textContent = 'Сохранить';
+  } else {
+    btn.textContent = 'Фильтровать';
+  }
+}
+
+function handleFilterBtn() {
+  const hasFilter = currentFilter.trim().length > 0;
+  const name = document.getElementById('filterName').value.trim();
+  if (hasFilter && name) {
+    saveFilter();
+  } else {
+    currentFilter = document.getElementById('hashtagFilter').value;
+    renderHashtagList();
+  }
+}
+
+function saveFilter() {
+  const filter = currentFilter.trim();
+  const name   = document.getElementById('filterName').value.trim();
+  if (!filter || !name) return;
+  const idx = savedFilters.findIndex(f => f.name === name);
+  if (idx >= 0) savedFilters[idx] = { id: savedFilters[idx].id, name, filter };
+  else savedFilters.push({ id: uid(), name, filter });
+  persistFilters();
+  document.getElementById('filterName').value = '';
+  updateFilterBtnLabel();
+  const btn = document.getElementById('btnFilter');
+  btn.textContent = '✓ Сохранено';
+  setTimeout(updateFilterBtnLabel, 1200);
+}
+
+function toggleSavedDropdown() {
+  const dd = document.getElementById('savedDropdown');
+  if (dd.style.display === 'none') {
+    renderSavedDropdown();
+    dd.style.display = 'block';
+  } else {
+    dd.style.display = 'none';
+  }
+}
+
+function renderSavedDropdown() {
+  const dd = document.getElementById('savedDropdown');
+  if (!savedFilters.length) {
+    dd.innerHTML = '<div class="saved-dd-empty">Нет сохранённых фильтров</div>';
+    return;
+  }
+  dd.innerHTML = '<div class="saved-dd-header">Сохранённые фильтры</div>' +
+    savedFilters.map(f =>
+      `<div class="saved-item">
+        <div onclick="loadSavedFilter('${h(f.id)}')" style="flex:1;cursor:pointer;">
+          <div class="saved-item-name">${h(f.name)}</div>
+          <div class="saved-item-filter">${h(f.filter)}</div>
+        </div>
+        <span class="saved-item-del" onclick="delSavedFilter('${h(f.id)}')" title="Удалить">✕</span>
+      </div>`
+    ).join('');
+}
+
+function loadSavedFilter(id) {
+  const f = savedFilters.find(x => x.id === id);
+  if (!f) return;
+  document.getElementById('hashtagFilter').value = f.filter;
+  currentFilter = f.filter;
+  document.getElementById('savedDropdown').style.display = 'none';
+  updateFilterUI();
+  renderHashtagList();
+}
+
+function delSavedFilter(id) {
+  deleteSharedFilter(id);
+}
+
+document.addEventListener('mousedown', e => {
+  const dd = document.getElementById('savedDropdown');
+  const btn = document.getElementById('btnDots');
+  if (!dd.contains(e.target) && e.target !== btn) dd.style.display = 'none';
+});
+
+// ── Breadcrumb navigation ──
+function renderBreadcrumb() {
+  const bc = document.getElementById('filterBreadcrumb');
+  const tokens = currentFilter.trim().split(/\s+/).filter(Boolean);
+  if (!tokens.length) { bc.innerHTML = ''; return; }
+  let parts = [];
+  for (let i = 0; i < tokens.length; i++) {
+    const prefix = tokens.slice(0, i + 1).join(' ');
+    parts.push(`<span class="bc-chip" onclick="setFilter(${JSON.stringify(prefix)})">${h(tokens[i])}</span>`);
+    if (i < tokens.length - 1) parts.push('<span class="bc-sep">›</span>');
+  }
+  parts.push(`<span class="bc-clear" onclick="clearFilter()" title="Сбросить фильтр">✕</span>`);
+  bc.innerHTML = parts.join(' ');
+}
+
+function setFilter(val) {
+  document.getElementById('hashtagFilter').value = val;
+  currentFilter = val;
+  updateFilterUI();
+  renderHashtagList();
+}
+
+function clearFilter() {
+  document.getElementById('hashtagFilter').value = '';
+  currentFilter = '';
+  updateFilterUI();
+  renderHashtagList();
+}
+
+// ── Hashtag entries ──
+function deleteHashtagLine(line) {
+  const lc = line.trim().toLowerCase();
+  const affected = notes.filter(n => (n.hashtags || []).some(t => t.trim().toLowerCase() === lc));
+  if (!affected.length) return;
+  const msg = affected.length === 1
+    ? `Удалить «${line}» из 1 заметки?`
+    : `Удалить «${line}» из ${affected.length} заметок?`;
+  if (!confirm(msg)) return;
+  for (const n of affected) {
+    n.hashtags = (n.hashtags || []).filter(t => t.trim().toLowerCase() !== lc);
+    n.updatedAt = Date.now();
+  }
+  persist();
+  renderNotesList();
+  // Refresh editor if open note was affected
+  if (currentNoteId && affected.some(n => n.id === currentNoteId)) {
+    const n = notes.find(x => x.id === currentNoteId);
+    if (n) document.getElementById('hashtagInput').value = (n.hashtags || []).join('\n');
+  }
+  renderHashtagList();
+}
+
+function renderHashtagList() {
+  const container = document.getElementById('hashtagEntries');
+  let all = allHashtagLines();
+
+  // Apply filter
+  const filterTokens = currentFilter.trim().split(/\s+/).filter(Boolean);
+  if (filterTokens.length) {
+    all = all.filter(line => {
+      const lt = line.trim().split(/\s+/).filter(Boolean);
+      if (lt.length < filterTokens.length) return false;
+      return filterTokens.every((t, i) => lt[i].toLowerCase() === t.toLowerCase());
+    });
+  }
+
+  if (!all.length) {
+    container.innerHTML = '<div class="no-results">Нет параметров' + (filterTokens.length ? ' по данному фильтру' : '') + '</div>';
+    return;
+  }
+
+  all.sort();
+
+  let prevLt = [];
+  container.innerHTML = all.map(line => {
+    const lt = line.trim().split(/\s+/).filter(Boolean);
+    const cnt = noteCountForLine(line);
+
+    // Считаем, сколько токенов (после фильтра) совпадают с предыдущей строкой.
+    // Последний токен никогда не скрываем — он всегда уникален для строки.
+    let commonLen = 0;
+    for (let i = filterTokens.length; i < Math.min(lt.length - 1, prevLt.length); i++) {
+      if (lt[i].toLowerCase() === prevLt[i].toLowerCase()) commonLen++;
+      else break;
+    }
+    prevLt = lt;
+
+    const startIdx = filterTokens.length + commonLen;
+    const remaining = lt.slice(startIdx);
+    const indent = commonLen * 14; // 14 px на каждый скрытый уровень
+
+    const spans = remaining.map((tok, j) => {
+      if (j === 0) return `<span class="ht-tok-next">${h(tok)}</span>`;
+      return `<span class="ht-tok-rest">${h(tok)}</span>`;
+    }).join(' ');
+
+    // Click drills down by one token beyond current filter
+    const nextPrefix = lt.slice(0, filterTokens.length + 1).join(' ');
+    const canDrill = lt.length > filterTokens.length + 1;
+    const drillAction = canDrill
+      ? `onclick="setFilter(${JSON.stringify(nextPrefix)})" title="Фильтровать по этому уровню"`
+      : '';
+
+    return `<div class="ht-entry" style="padding-left:${12 + indent}px;">
+      <div class="ht-entry-tokens" ${drillAction}>${spans}</div>
+      <span class="ht-note-count">${cnt} зам.</span>
+      <span class="ht-del" onclick="deleteHashtagLine(${JSON.stringify(line)})" title="Удалить из всех заметок">✕</span>
+    </div>`;
+  }).join('');
+}
+
+// ════════════════════════════════════════
+//  Print
+// ════════════════════════════════════════
+function printNotes() {
+  const visible = notes.filter(noteMatchesFilter);
+  if (!visible.length) { alert('Нет заметок для печати.'); return; }
+
+  const title = notesFilter.trim()
+    ? 'Заметки: ' + notesFilter.trim()
+    : 'Все заметки';
+
+  const rows = visible.map(n => {
+    const text = (n.content || '').trim();
+    const tags = (n.hashtags || []).join('  ');
+    const date = fmtDate(n.updatedAt || n.createdAt);
+    return `<div class="note">
+      ${text ? `<div class="note-text">${h(text).replace(/\n/g,'<br>')}</div>` : ''}
+      ${tags ? `<div class="note-tags">${h(tags)}</div>` : ''}
+      <div class="note-date">${date}</div>
+    </div>`;
+  }).join('');
+
+  const doc = `<!DOCTYPE html>
+<html lang="ru"><head><meta charset="UTF-8"><title>${h(title)}</title>
+<style>
+  body{font-family:system-ui,sans-serif;margin:24px 32px;color:#1a1d21;}
+  h1{font-size:15px;font-weight:600;color:#5f6368;margin-bottom:18px;border-bottom:1px solid #dde1e7;padding-bottom:8px;}
+  .note{border:1px solid #dde1e7;border-radius:6px;padding:12px 14px;margin-bottom:10px;break-inside:avoid;}
+  .note-text{font-size:14px;line-height:1.6;white-space:pre-wrap;word-break:break-word;}
+  .note-tags{font-size:12px;color:#1a73e8;font-family:'Courier New',monospace;margin-top:8px;}
+  .note-date{font-size:11px;color:#9aa0a6;margin-top:5px;}
+  @media print{body{margin:10px;}.note{border-color:#ccc;}}
+</style></head><body>
+<h1>${h(title)} — ${visible.length} шт.</h1>
+${rows}
+<script>window.onload=function(){window.print();}<\/script>
+</body></html>`;
+
+  const w = window.open('', '_blank', 'width=750,height=950');
+  if (!w) { alert('Разрешите всплывающие окна для печати.'); return; }
+  w.document.write(doc);
+  w.document.close();
+}
+
+// ════════════════════════════════════════
+//  Init
+// ════════════════════════════════════════
+renderNotesList();
+</script>
+</body>
+</html>
