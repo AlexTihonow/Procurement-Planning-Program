@@ -509,6 +509,113 @@
     }
 
     /* ══════════════════════════════
+       Виджеты главной страницы
+    ══════════════════════════════ */
+    .widget-card {
+      background: #fff;
+      border: 1px solid #dde1e7;
+      border-radius: 12px;
+      margin-bottom: 10px;
+      overflow: hidden;
+    }
+    .widget-main {
+      display: flex;
+      align-items: center;
+      padding: 14px 10px 14px 16px;
+      cursor: pointer;
+      gap: 10px;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    .widget-main:active { background: #f0f5ff; }
+    .widget-body { flex: 1; min-width: 0; }
+    .widget-label {
+      font-size: 26px;
+      font-weight: 700;
+      color: #1a1d21;
+      line-height: 1.1;
+    }
+    .widget-stat {
+      font-size: 26px;
+      font-weight: 700;
+      color: #1a1d21;
+      line-height: 1.1;
+    }
+    .widget-stat .widget-unit {
+      font-size: 13px;
+      font-weight: 400;
+      color: #9aa0a6;
+      margin-left: 4px;
+    }
+    .widget-empty {
+      font-size: 14px;
+      color: #c4c8cc;
+    }
+    .widget-gear {
+      flex-shrink: 0;
+      width: 40px;
+      height: 40px;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      color: #c4c8cc;
+      transition: background .1s, color .1s;
+    }
+    .widget-gear:hover, .widget-gear:active { background: #f0f2f5; color: #5f6368; }
+    .widget-gear.active { color: #1a73e8; background: #e8f0fe; }
+    .widget-edit {
+      padding: 0 14px 14px;
+      border-top: 1px solid #f0f2f5;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .widget-edit-input {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid #dde1e7;
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: inherit;
+      background: #f8f9fa;
+      transition: border-color .15s;
+    }
+    .widget-edit-input:focus { outline: none; border-color: #1a73e8; background: #fff; }
+    .widget-edit-filter {
+      font-family: 'Courier New', monospace;
+    }
+    .widget-edit-actions {
+      display: flex;
+      gap: 8px;
+    }
+    .widget-save-btn {
+      flex: 1;
+      padding: 9px;
+      background: #1a73e8;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .widget-save-btn:active { background: #1558b0; }
+    .widget-clear-btn {
+      padding: 9px 14px;
+      background: #f0f2f5;
+      color: #5f6368;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .widget-clear-btn:active { background: #e0e3e7; }
+
+    /* ══════════════════════════════
        Экран параметров
     ══════════════════════════════ */
     .params-scroll {
@@ -904,6 +1011,7 @@
         </div>
         <div class="settings-card-arrow">›</div>
       </div>
+      <div style="text-align:center;padding:24px 0 8px;font-size:13px;color:#c0c4cc;" id="appVersionLabel"></div>
     </div>
   </div>
 
@@ -948,6 +1056,18 @@
         </div>
       </div>
     </div>
+  </div>
+
+  <!-- ══════════════════════════════
+       Экран: Главная (виджеты)
+  ══════════════════════════════ -->
+  <div class="screen" id="screen-home">
+    <div class="topbar">
+      <div class="topbar-row">
+        <div class="topbar-title">Главная</div>
+      </div>
+    </div>
+    <div class="notes-scroll" id="homeWidgets"></div>
   </div>
 
   <!-- ══════════════════════════════
@@ -1023,6 +1143,10 @@
        Нижняя навигация
   ══════════════════════════════ -->
   <nav class="bottom-nav" style="display:none;">
+    <button class="nav-btn" id="nav-home" onclick="showScreen('home')">
+      <span class="nav-icon">⌂</span>
+      <span>Главная</span>
+    </button>
     <button class="nav-btn" id="nav-new" onclick="newNote()">
       <span class="nav-icon">＋</span>
       <span>Новая заметка</span>
@@ -1054,6 +1178,11 @@ let sfAcSuggestions   = [];
 let sfAcIndex         = -1;
 let sfAcVisible       = false;
 let sfAcReplacePartial = false;
+
+const APP_VERSION = '1.01';
+let widgets       = Array.from({length:5}, () => ({name:'', filter:''}));
+let widgetEditIdx = -1;
+const wAcState    = Array.from({length:5}, () => ({sugg:[], idx:-1, visible:false, replacePartial:false}));
 let autoSaveTimer     = null;
 let currentFilter     = '';
 let notesFilter       = '';
@@ -1183,10 +1312,9 @@ function showScreen(name) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('screen-' + name).classList.add('active');
 
-  // Скрываем нижнюю навигацию на экране входа
   document.querySelector('.bottom-nav').style.display = name === 'login' ? 'none' : '';
 
-  // bottom nav активность
+  document.getElementById('nav-home').classList.toggle('active', name === 'home');
   document.getElementById('nav-list').classList.toggle('active', name === 'list');
   document.getElementById('nav-params').classList.toggle('active', name === 'settings' || name === 'params');
   document.getElementById('nav-new').classList.toggle('active', false);
@@ -1195,6 +1323,8 @@ function showScreen(name) {
   if (name === 'list') renderNotesList();
   if (name === 'mailings') { mlResetForm(); loadMailings(); }
   if (name === 'smtp') { smtpLoad(); }
+  if (name === 'home') renderHomeWidgets();
+  if (name === 'settings') document.getElementById('appVersionLabel').textContent = 'Версия ' + APP_VERSION;
 }
 
 function goBack() {
@@ -2026,17 +2156,19 @@ async function initApp() {
     return;
   }
   try {
-    const [notesResp, filtersResp] = await Promise.all([
+    const [notesResp, filtersResp, widgetsResp] = await Promise.all([
       fetch('/api/notes',   { headers: authHeaders(false) }),
       fetch('/api/filters', { headers: authHeaders(false) }),
+      fetch('/api/widgets', { headers: authHeaders(false) }),
     ]);
     if (notesResp.status === 401) { handleUnauth(); return; }
     notes        = await notesResp.json();
     savedFilters = await filtersResp.json();
+    if (widgetsResp.ok) widgets = await widgetsResp.json();
   } catch (e) {
     console.error('Не удалось загрузить данные с сервера:', e);
   }
-  showScreen('list');
+  showScreen('home');
   // Автообновление каждые 30 секунд — подхватывает изменения других пользователей
   if (syncInterval) clearInterval(syncInterval);
   syncInterval = setInterval(syncFromServer, 30000);
@@ -2341,6 +2473,205 @@ function smtpSetStatus(msg, type) {
   el.className = 'ml-status' + (type ? ' ' + type : '');
   if (type === 'ok') setTimeout(() => { if (el.textContent === msg) { el.textContent = ''; el.className = 'ml-status'; } }, 4000);
 }
+
+// ════════════════════════════════════════
+//  Главная — виджеты
+// ════════════════════════════════════════
+function pluralShtuk(n) {
+  const mod10 = n % 10, mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 19) return 'штук';
+  if (mod10 === 1) return 'штука';
+  if (mod10 >= 2 && mod10 <= 4) return 'штуки';
+  return 'штук';
+}
+
+function noteMatchesCustomFilter(note, filterStr) {
+  if (!filterStr.trim()) return true;
+  const conditions = parseFilterConditions(filterStr);
+  if (!conditions.length) return true;
+  return conditions.every(tokens =>
+    (note.hashtags || []).some(line => {
+      const lt = line.trim().split(/\s+/).filter(Boolean);
+      if (lt.length < tokens.length) return false;
+      return tokens.every((t, i) => lt[i].toLowerCase() === t.toLowerCase());
+    })
+  );
+}
+
+function renderHomeWidgets() {
+  const el = document.getElementById('homeWidgets');
+  el.innerHTML = widgets.map((w, i) => {
+    const hasFilter = w.filter.trim().length > 0;
+    const name      = w.name.trim() || `Виджет ${i + 1}`;
+    const count     = hasFilter ? notes.filter(n => noteMatchesCustomFilter(n, w.filter)).length : null;
+    const isEditing = widgetEditIdx === i;
+
+    const mainHtml = `
+      <div class="widget-main" onclick="${hasFilter ? `applyWidgetFilter(${i})` : `toggleWidgetEdit(${i})`}">
+        <div class="widget-body">
+          ${hasFilter
+            ? `<div class="widget-label">${h(name)}</div>
+               <div class="widget-stat">${count}<span class="widget-unit">${pluralShtuk(count)}</span></div>`
+            : `<div class="widget-empty">Нажмите ⚙ для настройки</div>`
+          }
+        </div>
+        <button class="widget-gear${isEditing ? ' active' : ''}"
+          onclick="event.stopPropagation();toggleWidgetEdit(${i})"
+          title="Настроить виджет">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </button>
+      </div>`;
+
+    const editHtml = isEditing ? `
+      <div class="widget-edit">
+        <input class="widget-edit-input" id="wName${i}"
+          placeholder="Название виджета"
+          value="${h(w.name)}" />
+        <div style="position:relative;">
+          <input class="widget-edit-input widget-edit-filter" id="wFilter${i}"
+            placeholder="#Параметр Значение"
+            value="${h(w.filter)}"
+            oninput="onWFilterInput(${i})"
+            onkeydown="onWFilterKeydown(event,${i})"
+            onblur="setTimeout(()=>hideWAc(${i}),150)" />
+          <div class="sf-ac" id="wAc${i}" style="display:none;"></div>
+        </div>
+        <div class="widget-edit-actions">
+          <button class="widget-save-btn" onclick="saveWidget(${i})">Сохранить</button>
+          <button class="widget-clear-btn" onclick="clearWidget(${i})">Очистить</button>
+          <button class="widget-clear-btn" onclick="cancelWidgetEdit()">Отмена</button>
+        </div>
+      </div>` : '';
+
+    return `<div class="widget-card">${mainHtml}${editHtml}</div>`;
+  }).join('');
+}
+
+function toggleWidgetEdit(i) {
+  widgetEditIdx = widgetEditIdx === i ? -1 : i;
+  renderHomeWidgets();
+  if (widgetEditIdx === i) {
+    setTimeout(() => {
+      const inp = document.getElementById(`wName${i}`);
+      if (inp) inp.focus();
+    }, 50);
+  }
+}
+
+function cancelWidgetEdit() {
+  widgetEditIdx = -1;
+  renderHomeWidgets();
+}
+
+async function saveWidget(i) {
+  const name   = document.getElementById(`wName${i}`).value.trim();
+  const filter = document.getElementById(`wFilter${i}`).value.trim();
+  widgets[i] = { name, filter };
+  widgetEditIdx = -1;
+  renderHomeWidgets();
+  try { await API.req('POST', '/api/widgets', widgets); } catch(e) {}
+}
+
+async function clearWidget(i) {
+  widgets[i] = { name: '', filter: '' };
+  widgetEditIdx = -1;
+  renderHomeWidgets();
+  try { await API.req('POST', '/api/widgets', widgets); } catch(e) {}
+}
+
+function applyWidgetFilter(i) {
+  const w = widgets[i];
+  if (!w.filter.trim()) return;
+  notesFilter = w.filter;
+  const bar = document.getElementById('listSearchBar');
+  const btn = document.getElementById('listSearchBtn');
+  document.getElementById('sfInput').value = w.filter;
+  bar.classList.add('open');
+  btn.classList.add('active');
+  updateSfUI();
+  showScreen('list');
+}
+
+// ── Autocomplete в фильтре виджета ──
+function onWFilterInput(i) {
+  const inp = document.getElementById(`wFilter${i}`);
+  const textBefore = inp.value.slice(0, inp.selectionStart);
+  const lastHash   = textBefore.lastIndexOf('#');
+  const cond       = lastHash === -1 ? '' : textBefore.slice(lastHash);
+  const st         = wAcState[i];
+  if (!cond) { hideWAc(i); return; }
+  const { list: sugg, replacePartial } = getSuggestions(cond);
+  if (!sugg.length) { hideWAc(i); return; }
+  st.sugg = sugg; st.replacePartial = replacePartial; st.idx = -1; st.visible = true;
+  renderWAc(i);
+}
+
+function renderWAc(i) {
+  const ac = document.getElementById(`wAc${i}`);
+  const st = wAcState[i];
+  if (!st.sugg.length) { hideWAc(i); return; }
+  ac.innerHTML = '<div class="ac-hint">Продолжение параметра</div>' +
+    st.sugg.map((s, j) =>
+      `<div class="ac-item${j === st.idx ? ' sel' : ''}" onmousedown="event.preventDefault();applyWAc(${i},${j})">${h(s)}</div>`
+    ).join('');
+  ac.style.display = 'block';
+}
+
+function hideWAc(i) {
+  const st = wAcState[i];
+  st.visible = false; st.sugg = []; st.idx = -1;
+  const ac = document.getElementById(`wAc${i}`);
+  if (ac) ac.style.display = 'none';
+}
+
+function applyWAc(i, j) {
+  const st  = wAcState[i];
+  const inp = document.getElementById(`wFilter${i}`);
+  if (!inp || j < 0 || j >= st.sugg.length) return;
+  const pos  = inp.selectionStart;
+  const val  = inp.value;
+  const before    = val.slice(0, pos);
+  const lastHash  = before.lastIndexOf('#');
+  if (lastHash === -1) return;
+  const cond = before.slice(lastHash);
+  let newCond;
+  if (st.replacePartial) {
+    const sp = cond.trimEnd().lastIndexOf(' ');
+    newCond = (sp === -1 ? '' : cond.trimEnd().slice(0, sp + 1)) + st.sugg[j];
+  } else {
+    newCond = /\s$/.test(cond) ? cond + st.sugg[j] : cond + ' ' + st.sugg[j];
+  }
+  inp.value = val.slice(0, lastHash) + newCond + val.slice(pos);
+  const newPos = lastHash + newCond.length;
+  inp.setSelectionRange(newPos, newPos);
+  inp.focus();
+  hideWAc(i);
+}
+
+function onWFilterKeydown(e, i) {
+  const st = wAcState[i];
+  if (!st.visible) return;
+  if (e.key === 'ArrowDown') {
+    e.preventDefault(); st.idx = Math.min(st.idx + 1, st.sugg.length - 1); renderWAc(i);
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault(); st.idx = Math.max(st.idx - 1, -1); renderWAc(i);
+  } else if ((e.key === 'Enter' || e.key === 'Tab') && st.idx >= 0) {
+    e.preventDefault(); applyWAc(i, st.idx);
+  } else if (e.key === 'Escape') {
+    hideWAc(i);
+  }
+}
+
+document.addEventListener('mousedown', e => {
+  for (let i = 0; i < 5; i++) {
+    const ac  = document.getElementById(`wAc${i}`);
+    const inp = document.getElementById(`wFilter${i}`);
+    if (ac && !ac.contains(e.target) && e.target !== inp) hideWAc(i);
+  }
+});
 </script>
 </body>
 </html>

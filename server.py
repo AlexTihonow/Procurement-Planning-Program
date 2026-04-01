@@ -273,6 +273,9 @@ def mailing_scheduler():
             pass
         time.sleep(60)
 
+# Запускаем планировщик рассылок при импорте модуля (нужно для gunicorn)
+threading.Thread(target=mailing_scheduler, daemon=True).start()
+
 # ─── HTML ─────────────────────────────────────────────────────────
 @app.route('/')
 def index():
@@ -500,6 +503,29 @@ def test_smtp_settings():
         return jsonify({'error': str(e)}), 500
 
 
+# ─── API: Виджеты главной страницы ───────────────────────────────
+@app.route('/api/widgets', methods=['GET'])
+@require_auth
+def get_widgets():
+    with get_db() as conn:
+        row = conn.execute("SELECT value FROM settings WHERE key='widgets'").fetchone()
+    if row:
+        return jsonify(json.loads(row['value']))
+    return jsonify([{'name': '', 'filter': ''} for _ in range(5)])
+
+
+@app.route('/api/widgets', methods=['POST'])
+@require_auth
+def save_widgets():
+    data = request.get_json() or []
+    with get_db() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO settings (key, value) VALUES ('widgets', ?)",
+            (json.dumps(data, ensure_ascii=False),)
+        )
+    return jsonify({'ok': True})
+
+
 # ─── Запуск ───────────────────────────────────────────────────────
 if __name__ == '__main__':
     import socket
@@ -508,9 +534,6 @@ if __name__ == '__main__':
         local_ip = socket.gethostbyname(hostname)
     except Exception:
         local_ip = '127.0.0.1'
-
-    t = threading.Thread(target=mailing_scheduler, daemon=True)
-    t.start()
 
     print(f"\n{'='*45}")
     print(f"  Сервер MS2 запущен")
